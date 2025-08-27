@@ -84,15 +84,19 @@ kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_d
 
 ## Nếu lỗi
 docker run -it --rm --network kafka_network -v kafka_data:bitnami/kafka/data bitnami/kafka:2.8 bash
+
 cd /bitnami/kafka/data
 echo "broker.id=1" > meta.properties
 echo "listeners=PLAINTEXT://:9092" >> meta.properties
 cat meta.properties
 exit
+
 terraform validate
 terraform init
 terraform apply
+
 docker ps -a
+
 docker exec -it postgres psql -U postgres -d weather_db
 CREATE TABLE weather_summary (
     window_start TIMESTAMP,
