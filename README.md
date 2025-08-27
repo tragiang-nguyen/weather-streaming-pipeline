@@ -89,8 +89,11 @@ kubectl -n weather exec -it deployment/kafka -- /opt/bitnami/kafka/bin/kafka-con
 
 kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "TRUNCATE TABLE weather_summary;"
 
+kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "CREATE INDEX idx_window_start ON weather_summary (window_start);"
+
 kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "SELECT * FROM weather_summary;"
 
+kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "\timing on" -c "SELECT * FROM weather_summary WHERE window_start = '2025-08-27 15:00:00';"
 
 ## Nếu lỗi
 docker run -it --rm --network kafka_network -v kafka_data:bitnami/kafka/data bitnami/kafka:2.8 bash
