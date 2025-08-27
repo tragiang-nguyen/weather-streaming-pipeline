@@ -1,76 +1,294 @@
 terraform {
   required_providers {
     docker = {
-      source = "kreuzwerker/docker"
+      source  = "kreuzwerker/docker"
       version = "~> 3.0.2"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23.0"
     }
   }
 }
+
 provider "docker" {}
+
+provider "kubernetes" {
+  config_path = "~/.kube/config" # Path đến kubeconfig của minikube
+}
+
 resource "docker_volume" "kafka_data" {
   name = "kafka_data"
 }
-resource "docker_container" "kafka" {
-  name = "kafka"
-  image = "bitnami/kafka:2.8"
-  ports {
-    internal = 9092
-    external = 9092
-  }
-  env = [
-    "KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092",
-    "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1",
-    "KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181",
-    "KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092",
-    "KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT",
-    "KAFKA_BROKER_ID=1",
-    "KAFKA_HEAP_OPTS=-Xms512m -Xmx512m",
-    "KAFKA_ADVERTISED_HOST_NAME=localhost",
-    "KAFKA_ADVERTISED_PORT=9092",
-    "ALLOW_PLAINTEXT_LISTENER=yes"
-  ]
-  volumes {
-    volume_name = docker_volume.kafka_data.name
-    container_path = "/bitnami/kafka/data"
-  }
-  networks_advanced {
-    name = "kafka_network"
-  }
-  depends_on = [docker_container.zookeeper]
-}
-resource "docker_container" "zookeeper" {
-  name = "zookeeper"
-  image = "bitnami/zookeeper:latest"
-  ports {
-    internal = 2181
-    external = 2181
-  }
-  env = [
-    "ALLOW_ANONYMOUS_LOGIN=yes"
-  ]
-  networks_advanced {
-    name = "kafka_network"
+
+resource "kubernetes_namespace" "weather" {
+  metadata {
+    name = "weather"
   }
 }
-resource "docker_container" "postgres" {
-  name = "postgres"
-  image = "postgres:latest"
-  ports {
-    internal = 5432
-    external = 5432
+
+resource "kubernetes_deployment" "zookeeper" {
+  metadata {
+    name      = "zookeeper"
+    namespace = kubernetes_namespace.weather.metadata[0].name
   }
-  env = [
-    "POSTGRES_USER=postgres",
-    "POSTGRES_PASSWORD=postgres",
-    "POSTGRES_DB=weather_db"
-  ]
-  networks_advanced {
-    name = "db_network"
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "zookeeper"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "zookeeper"
+        }
+      }
+      spec {
+        container {
+          image = "bitnami/zookeeper:latest"
+          name  = "zookeeper"
+          port {
+            container_port = 2181
+          }
+          env {
+            name  = "ALLOW_ANONYMOUS_LOGIN"
+            value = "yes"
+          }
+        }
+      }
+    }
   }
 }
-resource "docker_network" "kafka_network" {
-  name = "kafka_network"
+
+resource "kubernetes_service" "zookeeper_service" {
+  metadata {
+    name      = "zookeeper-service"
+    namespace = kubernetes_namespace.weather.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "zookeeper"
+    }
+    port {
+      protocol    = "TCP"
+      port        = 2181
+      target_port = 2181
+    }
+  }
 }
-resource "docker_network" "db_network" {
-  name = "db_network"
+
+resource "kubernetes_deployment" "kafka" {
+  metadata {
+    name      = "kafka"
+    namespace = kubernetes_namespace.weather.metadata[0].name
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "kafka"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "kafka"
+        }
+      }
+      spec {
+        container {
+          image = "bitnami/kafka:2.8"
+          name  = "kafka"
+          port {
+            container_port = 9092
+          }
+          env {
+            name  = "KAFKA_ADVERTISED_LISTENERS"
+            value = "PLAINTEXT://kafka-service:9092"
+          }
+          env {
+            name  = "KAFKA_LISTENERS"
+            value = "PLAINTEXT://0.0.0.0:9092"
+          }
+          env {
+            name  = "KAFKA_ZOOKEEPER_CONNECT"
+            value = "zookeeper-service:2181"
+          }
+          env {
+            name  = "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR"
+            value = "1"
+          }
+          env {
+            name  = "ALLOW_PLAINTEXT_LISTENER"
+            value = "yes"
+          }
+          env {
+            name  = "KAFKA_BROKER_ID"
+            value = "1"
+          }
+          volume_mount {
+            name       = "kafka-data"
+            mount_path = "/bitnami/kafka/data"
+          }
+        }
+        volume {
+          name = "kafka-data"
+          empty_dir {}
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service" "kafka_service" {
+  metadata {
+    name      = "kafka-service"
+    namespace = kubernetes_namespace.weather.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "kafka"
+    }
+    port {
+      protocol    = "TCP"
+      port        = 9092
+      target_port = 9092
+    }
+  }
+}
+
+resource "kubernetes_deployment" "postgres" {
+  metadata {
+    name      = "postgres"
+    namespace = kubernetes_namespace.weather.metadata[0].name
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "postgres"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "postgres"
+        }
+      }
+      spec {
+        container {
+          image = "postgres:latest"
+          name  = "postgres"
+          port {
+            container_port = 5432
+          }
+          env {
+            name  = "POSTGRES_USER"
+            value = "postgres"
+          }
+          env {
+            name  = "POSTGRES_DB"
+            value = "weather_db"
+          }
+          env {
+            name  = "POSTGRES_HOST_AUTH_METHOD"
+            value = "trust"
+          }
+          volume_mount {
+            name       = "postgres-config"
+            mount_path = "/etc/postgresql/pg_hba.conf"
+            sub_path   = "pg_hba.conf"
+          }
+        }
+        volume {
+          name = "postgres-config"
+          config_map {
+            name = kubernetes_config_map.postgres_config.metadata[0].name
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_config_map" "postgres_config" {
+  metadata {
+    name      = "postgres-config"
+    namespace = kubernetes_namespace.weather.metadata[0].name
+  }
+  data = {
+    "pg_hba.conf" = "local all all trust\nhost all all 0.0.0.0/0 trust"
+  }
+}
+
+resource "kubernetes_service" "postgres_service" {
+  metadata {
+    name      = "postgres-service"
+    namespace = kubernetes_namespace.weather.metadata[0].name
+  }
+  spec {
+    selector = {
+      app = "postgres"
+    }
+    port {
+      protocol    = "TCP"
+      port        = 5432
+      target_port = 5432
+    }
+  }
+}
+
+resource "kubernetes_deployment" "weather_pipeline" {
+  metadata {
+    name      = "weather-pipeline"
+    namespace = kubernetes_namespace.weather.metadata[0].name
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "weather-pipeline"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "weather-pipeline"
+        }
+      }
+      spec {
+        container {
+          image             = "weather-pipeline:latest"
+          image_pull_policy = "IfNotPresent"
+          name              = "weather-pipeline"
+          command           = ["/bin/bash", "-c"]
+          args              = [
+            "python3 /app/producer.py & python3 /opt/spark/work-dir/streaming_pipeline.py"
+          ]
+          env {
+            name  = "JDBC_URL"
+            value = "jdbc:postgresql://postgres-service:5432/weather_db"
+          }
+          env {
+            name  = "JDBC_USER"
+            value = "postgres"
+          }
+          env {
+            name  = "KAFKA_BOOTSTRAP_SERVERS"
+            value = "kafka-service:9092"
+          }
+          volume_mount {
+            name       = "checkpoint-volume"
+            mount_path = "/opt/spark/checkpoint"
+          }
+        }
+        volume {
+          name = "checkpoint-volume"
+          empty_dir {}
+        }
+      }
+    }
+  }
 }

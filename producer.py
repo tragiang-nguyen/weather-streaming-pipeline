@@ -41,7 +41,7 @@ while True:
     if weather_data:
         producer.send('weather_data', weather_data)
         print(f"Sent: {weather_data}")
-    time.sleep(10)
+    time.sleep(0.006)
 producer.flush()
 
 print("Weather data streaming started.")
