@@ -1,6 +1,6 @@
 # Weather Data Streaming Pipeline
 
-Thiết kế và triển khai hệ thống pipeline dữ liệu thời gian thực mô phỏng GCP Dataflow và Cloud Pub/Sub, sử dụng Apache Kafka làm broker và Spark Structured Streaming để xử lý dữ liệu với tốc độ mục tiêu 10.000 bản ghi mỗi phút. Hệ thống được container hóa bằng Docker, triển khai trên Kubernetes (Minikube), quản lý hạ tầng bằng Terraform, và đảm bảo khả năng mở rộng/chịu lỗi qua checkpointing. Tối ưu hóa hiệu suất với indexing PostgreSQL, giảm thời gian query xuống dưới 5ms trên bảng trống.
+Thiết kế và triển khai hệ thống pipeline dữ liệu thời gian thực mô phỏng GCP Dataflow và Cloud Pub/Sub, sử dụng Apache Kafka làm broker và Spark Structured Streaming để xử lý dữ liệu với tốc độ mục tiêu 10.000 bản ghi mỗi phút. Hệ thống được container hóa bằng Docker, triển khai trên Kubernetes (Minikube), quản lý hạ tầng bằng Terraform. Tối ưu hóa hiệu suất với indexing PostgreSQL, giảm thời gian query xuống dưới 5ms trên bảng trống.
 
 ## Prerequisites
 
