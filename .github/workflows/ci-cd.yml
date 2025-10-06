@@ -1,0 +1,78 @@
+name: CI/CD Pipeline for Realtime Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        pip install kafka-python requests pyspark pytest
+
+    - name: Run tests
+      run: |
+        PYTHONPATH=. pytest tests/ -v
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        docker build -t weather-pipeline:latest .
+
+    - name: Test Docker image
+      run: |
+        docker run --rm weather-pipeline:latest python3 -c "print('Image built successfully')"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Minikube
+      uses: medyagh/setup-minikube@v1
+      with:
+        driver: docker
+        kubernetes-version: v1.33.1
+
+    - name: Start Minikube
+      run: |
+        minikube start --driver=docker --cpus=4 --memory=4096mb
+
+    - name: Load Docker image into Minikube
+      run: |
+        minikube image load weather-pipeline:latest
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Plan
+      run: terraform plan -no-color
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve

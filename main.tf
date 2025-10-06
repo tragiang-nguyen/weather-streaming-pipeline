@@ -47,7 +47,7 @@ resource "kubernetes_deployment" "zookeeper" {
       }
       spec {
         container {
-          image = "bitnami/zookeeper:latest"
+          image = "zookeeper:3.9.2"
           name  = "zookeeper"
           port {
             container_port = 2181
@@ -99,7 +99,7 @@ resource "kubernetes_deployment" "kafka" {
       }
       spec {
         container {
-          image = "bitnami/kafka:2.8"
+          image = "confluentinc/cp-kafka:7.5.0"
           name  = "kafka"
           port {
             container_port = 9092

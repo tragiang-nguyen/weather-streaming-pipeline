@@ -56,44 +56,68 @@ realtime-pipeline/
 
 ## 2. Chạy dự án
 wsl --list --all
+
 cd D:\projects\realtime-pipeline
+
 wsl -d Ubuntu-D -u user
 
 minikube stop
+
 minikube delete
 
 minikube start --driver=docker
+
 minikube status
 
 kubectl get nodes
 
 minikube image build -t weather-pipeline:latest .
+
 terraform init
+
 terraform apply
 
 kubectl get namespaces
+
 kubectl -n weather get deployments
+
 kubectl -n weather get services
+
 kubectl -n weather get pods
 
 kubectl -n weather exec -it deployment/kafka -- /opt/bitnami/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka-service:9092 --topic weather_data --from-beginning
 
 kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "TRUNCATE TABLE weather_summary;"
+
+kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "CREATE INDEX idx_window_start ON weather_summary (window_start);"
+
 kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "SELECT * FROM weather_summary;"
 
+kubectl -n weather exec -it deployment/postgres -- psql -U postgres -d weather_db -c "\timing on" -c "SELECT * FROM weather_summary WHERE window_start = '2025-08-27 15:00:00';"
 
 ## Nếu lỗi
 docker run -it --rm --network kafka_network -v kafka_data:bitnami/kafka/data bitnami/kafka:2.8 bash
+
 cd /bitnami/kafka/data
+
 echo "broker.id=1" > meta.properties
+
 echo "listeners=PLAINTEXT://:9092" >> meta.properties
+
 cat meta.properties
+
 exit
+
 terraform validate
+
 terraform init
+
 terraform apply
+
 docker ps -a
+
 docker exec -it postgres psql -U postgres -d weather_db
+
 CREATE TABLE weather_summary (
     window_start TIMESTAMP,
     window_end TIMESTAMP,
@@ -101,5 +125,7 @@ CREATE TABLE weather_summary (
     avg_humidity DOUBLE PRECISION,
     avg_wind_speed DOUBLE PRECISION
 );
+
 \dt
+
 exit
