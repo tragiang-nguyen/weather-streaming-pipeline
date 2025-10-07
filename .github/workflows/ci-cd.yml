@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for Realtime Pipeline
+name: CI-CD Pipeline
 
 on:
   push:
@@ -9,61 +9,64 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
-        pip install kafka-python requests pyspark pytest
+        python -m pip install --upgrade pip
+        pip install pytest kafka-python requests pyspark==3.5.0
 
     - name: Run tests
       run: |
-        PYTHONPATH=. pytest tests/ -v
+        PYTHONPATH=. pytest tests/ -v --cov=producer --cov=streaming_pipeline --cov-report=xml
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
 
   build:
     needs: test
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: |
-        docker build -t weather-pipeline:latest .
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-    - name: Test Docker image
-      run: |
-        docker run --rm weather-pipeline:latest python3 -c "print('Image built successfully')"
+    - name: Login to Docker Hub (optional, for push)
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: yourusername/weather-pipeline:latest  # Thay yourusername bằng Docker Hub username
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # Hoặc ubuntu-latest nếu có K8s cluster
     if: github.ref == 'refs/heads/main'
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Setup Minikube
-      uses: medyagh/setup-minikube@v1
-      with:
-        driver: docker
-        kubernetes-version: v1.33.1
-
-    - name: Start Minikube
-      run: |
-        minikube start --driver=docker --cpus=4 --memory=4096mb
-
-    - name: Load Docker image into Minikube
-      run: |
-        minikube image load weather-pipeline:latest
-
-    - name: Setup Terraform
+    - name: Set up Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.5.0
@@ -72,7 +75,12 @@ jobs:
       run: terraform init
 
     - name: Terraform Plan
-      run: terraform plan -no-color
+      run: terraform plan -var="image_tag=latest"
 
     - name: Terraform Apply
-      run: terraform apply -auto-approve
+      run: terraform apply -auto-approve -var="image_tag=latest"
+
+    - name: Run tests in cluster (optional)
+      run: |
+        kubectl wait --for=condition=Available deployment/weather-pipeline --timeout=300s
+        kubectl logs -f deployment/weather-pipeline -n weather

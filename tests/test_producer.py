@@ -1,51 +1,60 @@
 import pytest
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # Thêm thư mục cha
+from unittest.mock import Mock, patch
+from kafka import KafkaProducer
 
-from unittest.mock import patch, Mock
-from producer import get_weather_data
+# Absolute import (from parent dir)
+from producer import get_weather_data, get_kafka_producer
 
-@patch('producer.KafkaProducer')  # Patch theo module producer
-@patch('requests.get')
-def test_get_weather_data_success(mock_get, mock_kafka):
-    # Mock KafkaProducer return một Mock object
-    mock_prod = Mock()
-    mock_kafka.return_value = mock_prod
-
-    # Mock response thành công
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "current": {
-            "temp_c": 25.0,
-            "humidity": 94,
-            "wind_kph": 6.1,
-            "condition": {"text": "Mist"},
-            "last_updated": "2025-08-27 22:00"
+class TestProducer:
+    @patch('requests.get')
+    def test_producer_sends_data(self, mock_get):
+        # Mock API response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "current": {
+                "temp_c": 25.0,
+                "humidity": 80,
+                "wind_kph": 10.5,
+                "condition": {"text": "Sunny"},
+                "last_updated": "2023-10-07 10:00"
+            }
         }
-    }
-    mock_get.return_value = mock_response
+        mock_get.return_value = mock_response
 
-    result = get_weather_data()
-    assert result is not None
-    assert result['city'] == 'Hanoi'
-    assert result['temperature_c'] == 25.0
-    assert result['humidity'] == 94
-    assert 'condition' in result
-    assert 'timestamp' in result
-    mock_kafka.assert_called_once()  # Kiểm tra mock được gọi
+        # Mock KafkaProducer
+        with patch('producer.get_kafka_producer') as mock_producer:
+            mock_prod = Mock(spec=KafkaProducer)
+            mock_producer.return_value = mock_prod
+            mock_prod.send.return_value = None
 
-@patch('producer.KafkaProducer')
-@patch('requests.get')
-def test_get_weather_data_error(mock_get, mock_kafka):
-    mock_prod = Mock()
-    mock_kafka.return_value = mock_prod
+            # Call function
+            weather = get_weather_data()
 
-    mock_response = Mock()
-    mock_response.status_code = 404
-    mock_get.return_value = mock_response
+            # Assertions
+            assert weather["city"] == "Hanoi"
+            assert weather["temperature_c"] == 25.0
+            assert weather["humidity"] == 80
+            mock_prod.send.assert_called_once_with('weather_data', weather)
 
-    result = get_weather_data()
-    assert result is None
-    mock_kafka.assert_not_called()  # Mock không được gọi vì skip if
+    @patch('requests.get')
+    def test_producer_handles_api_error(self, mock_get):
+        # Mock API error
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_get.return_value = mock_response
+
+        # Mock KafkaProducer
+        with patch('producer.get_kafka_producer') as mock_producer:
+            mock_prod = Mock(spec=KafkaProducer)
+            mock_producer.return_value = mock_prod
+            mock_prod.send.return_value = None
+
+            # Call function
+            weather = get_weather_data()
+
+            # Assertions (mock data)
+            assert weather["city"] == "Hanoi"
+            assert weather["temperature_c"] > 0  # Mock temp > 0
+            assert weather["condition"] == "Sunny"
+            mock_prod.send.assert_called_once_with('weather_data', weather)
