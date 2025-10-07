@@ -25,7 +25,7 @@ jobs:
 
     - name: Run tests
       run: |
-        PYTHONPATH=. pytest tests/ -v --cov=producer --cov=streaming_pipeline --cov-report=xml
+        PYTHONPATH=. pytest tests/ -v
 
     - name: Upload coverage
       uses: codecov/codecov-action@v4
