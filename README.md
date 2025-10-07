@@ -1,4 +1,4 @@
-# Ống Dữ Liệu Thời Gian Thực Thời Tiết (Realtime Weather Data Pipeline)
+# Realtime Weather Data Pipeline
 
 ## Tổng Quan
 Dự án này triển khai một đường ống dữ liệu thời gian thực mô phỏng GCP Dataflow và Cloud Pub/Sub bằng Apache Kafka (để thu thập dữ liệu) và Spark Structured Streaming (để xử lý). Nó xử lý khoảng 10.000 điểm dữ liệu thời tiết mỗi phút từ API giả lập, tổng hợp trung bình hàng giờ (nhiệt độ, độ ẩm, tốc độ gió) với watermarking cho dữ liệu muộn, và ghi vào PostgreSQL. Hệ thống chịu lỗi với checkpointing, được container hóa bằng Docker, triển khai trên Kubernetes (Minikube), và quản lý bằng Terraform. Hiệu suất được tối ưu hóa với indexing PostgreSQL (query <5ms).

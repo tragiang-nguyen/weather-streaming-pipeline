@@ -243,7 +243,7 @@ resource "kubernetes_service" "postgres_service" {
 # Nâng cấp checkpointing: PersistentVolumeClaim để chịu lỗi thực sự (không mất dữ liệu khi pod restart)
 resource "kubernetes_persistent_volume_claim" "checkpoint_pvc" {
   metadata {
-    name      = "checkpoint-pvc"
+    name = "checkpoint-pvc"
     namespace = kubernetes_namespace.weather.metadata[0].name
   }
   spec {
@@ -276,7 +276,7 @@ resource "kubernetes_deployment" "weather_pipeline" {
       }
       spec {
         container {
-          image = "weather-pipeline:latest"
+          image = "${var.docker_image}:${var.image_tag}"  # Sử dụng biến
           image_pull_policy = "IfNotPresent"
           name = "weather-pipeline"
           command = ["/bin/bash", "-c"]
