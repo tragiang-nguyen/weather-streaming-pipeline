@@ -60,8 +60,8 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted  # Thay ubuntu-latest để dùng local Minikube (nếu self-hosted runner)
+    if: github.ref == 'refs/heads/main'  # Comment if để disable tạm
 
     steps:
     - uses: actions/checkout@v4
@@ -71,10 +71,10 @@ jobs:
       with:
         version: 'latest'
 
-    - name: Configure kubeconfig (Minikube local or cloud)
+    - name: Configure kubeconfig
       run: |
-        # Nếu Minikube: echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig
-        # Nếu GKE: gcloud container clusters get-credentials cluster-name --zone zone --project project
+        # Minikube local: echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig
+        # GKE: gcloud container clusters get-credentials cluster-name --zone zone --project project
         echo "Kubeconfig setup complete"
 
     - name: Set up Terraform
