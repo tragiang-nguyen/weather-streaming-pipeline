@@ -26,14 +26,14 @@ cd realtime-pipeline
 
 ### 2. Thiết Lập Môi Trường (Tests)
 ```bash
-python3 -m venv stock_test_env
-source stock_test_env/bin/activate  # Trên Windows: stock_test_env\Scripts\activate
+python -m venv venv
+.\venv\Scripts\activate
 pip install pytest kafka-python requests pyspark==3.5.0 pytest-cov
 ```
 
 ### 3. Chạy Tests
 ```bash
-PYTHONPATH=. pytest tests/ -v
+pytest tests/ -v
 ```
 - Kết quả mong đợi: 4 tests passed (2 producer, 2 streaming).
 
